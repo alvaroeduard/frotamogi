@@ -1,0 +1,231 @@
+{% extends 'frota/base.html' %}
+
+{% block titulo %}Disponibilidade da Frota{% endblock %}
+
+{% block conteudo %}
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h4 class="mb-0">Consulta de Disponibilidade da Frota</h4>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-center mb-4">
+            <div class="col-lg-3 col-md-6">
+                <input type="text" name="placa" class="form-control" placeholder="Pesquisar por placa..." value="{{ request.GET.placa|default:'' }}">
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <select name="regional" class="form-select">
+                    <option value="">Filtrar por Regional...</option>
+                    {% for regional in regionais %}
+                    <option value="{{ regional.id }}" {% if regional.id == regional_id_selecionado %}selected{% endif %}>{{ regional.sigla }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <select name="departamento" class="form-select">
+                    <option value="">Filtrar por departamento...</option>
+                    {% for depto in departamentos %}
+                    <option value="{{ depto.id }}" {% if depto.id == depto_id_selecionado %}selected{% endif %}>{{ depto.sigla }} - {{ depto.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-3 col-md-6">
+                <select name="status" class="form-select">
+                    <option value="">Filtrar por Status...</option>
+                    {% for value, display_name in status_choices %}
+                    <option value="{{ value }}" {% if value == status_selecionado %}selected{% endif %}>{{ display_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-lg-3 col-md-6">
+                <select name="tipo_veiculo" class="form-select">
+                    <option value="">Filtrar por Tipo...</option>
+                    {% for value, display_name in tipo_veiculo_choices %}
+                    <option value="{{ value }}" {% if value == tipo_veiculo_selecionado %}selected{% endif %}>
+                        {{ display_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-lg-3 col-md-6">
+                <select name="segmento" class="form-select">
+                    <option value="">Filtrar por Segmento...</option>
+                    {% for value, display_name in segmento_choices %}
+                    <option value="{{ value }}" {% if value == segmento_selecionado %}selected{% endif %}>
+                        {{ display_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-6 col-md-12">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Pesquisar</button>
+                <a href="{% url 'index' %}" class="btn btn-secondary"><i class="fas fa-sync-alt"></i> Limpar</a>
+            </div>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Prefixo</th>
+                        <th>Modelo</th>
+                        <th>Placa</th>
+                        <th>Departamento</th>
+                        <th>Regional</th>
+                        <th>Status</th>
+                        <th>Data Previsão de Saida</th>
+                        <th>OS/Ticket</th>
+                        <th>Status OS</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for veiculo in veiculos %}
+                    <tr>
+                        <td>{{ veiculo.prefixo|default:"S/PREFIXO" }}</td>
+                        <td>{{ veiculo.modelo }}</td>
+                        <td>{{ veiculo.placa }}</td>
+                        <td>{{ veiculo.departamento.sigla }}</td>
+                        <td>{{ veiculo.regional.sigla }}</td>
+                        <td>
+                            {% if veiculo.status == 'Disponível' %}
+                            <span class="badge badge-disponivel">{{ veiculo.status }}</span>
+                            {% elif veiculo.status == 'Em Manutenção' %}
+                            <span class="badge badge-manutencao">{{ veiculo.status }}</span>
+                            {% elif veiculo.status == 'Indisponível' %}
+                            <span class="badge badge-indisponivel">{{ veiculo.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ veiculo.manutencao.data_previsao_saida|date:'d/m/Y'|default:'N/A' }}</td>
+                        <td>
+                            {% if veiculo.status == 'Em Manutenção' and veiculo.manutencao %}
+                                {{ veiculo.manutencao.numero_os }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if veiculo.status == 'Em Manutenção' and veiculo.manutencao %}
+                                {{ veiculo.manutencao.status_os }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if veiculo.status == 'Em Manutenção' %}
+                            <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#detalhesManutencaoModal"
+                                data-placa="{{ veiculo.placa }}"
+                                data-prefixo="{{ veiculo.prefixo }}"
+                                data-modelo="{{ veiculo.modelo.nome }}"
+                                data-servicos="{{ veiculo.manutencao.servicos }}"
+                                data-oficina="{{ veiculo.manutencao.nome_oficina|default:'N/A' }}"
+                                data-cidade="{{ veiculo.manutencao.cidade_oficina|default:'N/A' }}" data-entrada="{{ veiculo.manutencao.data_entrada|date:'d/m/Y' }}"
+                                data-previsao="{{ veiculo.manutencao.data_previsao_saida|date:'d/m/Y'|default:'N/A' }}"
+                                data-os="{{ veiculo.manutencao.numero_os }}"
+                                data-statusos="{{ veiculo.manutencao.status_os }}">
+                                <i class="fas fa-wrench"></i> Detalhes
+                            </button>
+                            {% elif veiculo.status == 'Indisponível' %}
+                            <button class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#detalhesIndisponivelModal"
+                                data-placa="{{ veiculo.placa }}"
+                                data-prefixo="{{ veiculo.prefixo }}"
+                                data-modelo="{{ veiculo.modelo }}"
+                                data-motivo="{{ veiculo.indisponibilidade.motivo }}">
+                                <i class="fas fa-info-circle"></i> Detalhes
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center">Nenhum veículo encontrado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="detalhesManutencaoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes da Manutenção</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Placa:</strong> <span id="manut-placa"></span></p>
+                <p><strong>Prefixo:</strong> <span id="manut-prefixo"></span></p>
+                <p><strong>Modelo:</strong> <span id="manut-modelo"></span></p>
+                <hr>
+                <p><strong>Serviços:</strong> <span id="manut-servicos"></span></p>
+                <p><strong>Oficina:</strong> <span id="manut-oficina"></span></p>
+                <p><strong>Cidade da Oficina:</strong> <span id="manut-cidade"></span></p> <p><strong>Data de Entrada:</strong> <span id="manut-entrada"></span></p>
+                <p><strong>Previsão de Saída:</strong> <span id="manut-previsao"></span></p>
+                <p><strong>Número da OS/Ticket:</strong> <span id="manut-os"></span></p>
+                <p><strong>Status da OS:</strong> <span id="manut-statusos"></span></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="detalhesIndisponivelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Detalhes da Indisponibilidade</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong>Placa:</strong> <span id="indisp-placa"></span></p>
+                <p><strong>Prefixo:</strong> <span id="indisp-prefixo"></span></p>
+                <p><strong>Modelo:</strong> <span id="indisp-modelo"></span></p>
+                <hr>
+                <p><strong>Motivo:</strong> <span id="indisp-motivo"></span></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const manutencaoModal = document.getElementById('detalhesManutencaoModal');
+    if(manutencaoModal) {
+        manutencaoModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            document.getElementById('manut-placa').textContent = button.getAttribute('data-placa');
+            document.getElementById('manut-prefixo').textContent = button.getAttribute('data-prefixo');
+            document.getElementById('manut-modelo').textContent = button.getAttribute('data-modelo');
+            document.getElementById('manut-servicos').textContent = button.getAttribute('data-servicos');
+            document.getElementById('manut-oficina').textContent = button.getAttribute('data-oficina');
+            document.getElementById('manut-cidade').textContent = button.getAttribute('data-cidade'); // ADICIONE ESTA LINHA
+            document.getElementById('manut-entrada').textContent = button.getAttribute('data-entrada');
+            document.getElementById('manut-previsao').textContent = button.getAttribute('data-previsao');
+            document.getElementById('manut-os').textContent = button.getAttribute('data-os');
+            document.getElementById('manut-statusos').textContent = button.getAttribute('data-statusos');
+        });
+    }
+
+    const indisponivelModal = document.getElementById('detalhesIndisponivelModal');
+    if(indisponivelModal) {
+        indisponivelModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            document.getElementById('indisp-placa').textContent = button.getAttribute('data-placa');
+            document.getElementById('indisp-prefixo').textContent = button.getAttribute('data-prefixo');
+            document.getElementById('indisp-modelo').textContent = button.getAttribute('data-modelo');
+            document.getElementById('indisp-motivo').textContent = button.getAttribute('data-motivo');
+        });
+    }
+});
+</script>
+{% endblock %}
